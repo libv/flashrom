@@ -872,9 +872,15 @@ struct flashrom_pci_device {
 	size_t mmio_size;
 
 	const void *private; /* programmer specific hook */
+
+	/* housekeeping */
+	bool enabled;
+	bool was_disabled;
 };
 
 struct flashrom_pci_device *flashrom_pci_init(const struct flashrom_pci_match *matches);
+int flashrom_pci_device_enable(struct flashrom_pci_device *device);
+int flashrom_pci_device_disable(struct flashrom_pci_device *device);
 int flashrom_pci_mmio_map(struct flashrom_pci_device *device, int bar);
 void flashrom_pci_mmio_unmap(struct flashrom_pci_device *device);
 

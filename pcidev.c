@@ -420,6 +420,115 @@ flashrom_pci_mmio_unmap(struct flashrom_pci_device *device)
 /*
  *
  */
+int
+flashrom_pci_device_enable(struct flashrom_pci_device *device)
+{
+	char filename[1024];
+	int fd, ret;
+	char enable;
+
+	if (device->enabled)
+		return 0;
+
+	snprintf(filename, sizeof(filename) - 1,
+		 "%senable", device->sysfs_path);
+
+	fd = open(filename, O_RDWR);
+	if (fd == -1) {
+		msg_perr("%s: failed to open %s: %s\n",
+			 __func__, filename, strerror(errno));
+		return errno;
+	}
+
+	ret = read(fd, &enable, 1);
+	if (ret != 1) {
+		close(fd);
+		msg_perr("%s: failed to read %s: %s\n",
+			 __func__, filename, strerror(errno));
+		return errno;
+	}
+
+	if (enable == '0') {
+		device->was_disabled = true;
+		ret = write(fd, "1", 1);
+		if (ret != 1) {
+			close(fd);
+			msg_perr("%s: failed to write %s: %s\n",
+				 __func__, filename, strerror(errno));
+			return errno;
+		}
+	} else if (enable != '1') {
+		close(fd);
+		msg_perr("%s: invalid value read from %s: %c\n",
+			 __func__, filename, enable);
+		return EINVAL;
+	}
+
+	close(fd);
+
+	device->enabled = true;
+
+	return 0;
+}
+
+/*
+ *
+ */
+int
+flashrom_pci_device_disable(struct flashrom_pci_device *device)
+{
+	char filename[1024];
+	int fd, ret;
+	char enable;
+
+	/* We do not want to disable the device if we did not enable it */
+	if (!device->enabled || !device->was_disabled)
+		return 0;
+
+	snprintf(filename, sizeof(filename) - 1,
+		 "%senable", device->sysfs_path);
+
+	fd = open(filename, O_RDWR);
+	if (fd == -1) {
+		msg_perr("%s: failed to open %s: %s\n",
+			 __func__, filename, strerror(errno));
+		return errno;
+	}
+
+	ret = read(fd, &enable, 1);
+	if (ret != 1) {
+		close(fd);
+		msg_perr("%s: failed to read %s: %s\n",
+			 __func__, filename, strerror(errno));
+		return errno;
+	}
+
+	if (enable == '1') {
+		ret = write(fd, "0", 1);
+		if (ret != 1) {
+			close(fd);
+			msg_perr("%s: failed to write %s: %s\n",
+				 __func__, filename, strerror(errno));
+			return errno;
+		}
+	} else if (enable != '0') {
+		close(fd);
+		msg_perr("%s: invalid value read from %s: %c\n",
+			 __func__, filename, enable);
+		return EINVAL;
+	}
+
+	close(fd);
+
+	device->enabled = false;
+
+	return 0;
+}
+
+
+/*
+ *
+ */
 static int
 flashrom_pci_device_shutdown(void *data)
 {
@@ -432,6 +541,8 @@ flashrom_pci_device_shutdown(void *data)
 	}
 
 	flashrom_pci_mmio_unmap(device);
+
+	flashrom_pci_device_disable(device);
 
 	free(device->sysfs_path);
 	device->sysfs_path = NULL;
@@ -540,6 +651,9 @@ flashrom_pci_init(const struct flashrom_pci_match *matches)
 	device->private = found_match->private;
 
 	register_shutdown(flashrom_pci_device_shutdown, device);
+
+	if (flashrom_pci_device_enable(device))
+		return NULL;
 
 	return device;
 }
