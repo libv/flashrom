@@ -543,3 +543,96 @@ flashrom_pci_init(const struct flashrom_pci_match *matches)
 
 	return device;
 }
+
+/*
+ *
+ * Accessors of mmio.
+ *
+ * It is nonsensical to roll these back automatically.
+ * Programmers are responsible for their own restauration.
+ *
+ */
+uint8_t flashrom_pci_mmio_byte_read(struct flashrom_pci_device *device,
+				    off_t address)
+{
+	if (address >= device->mmio_size) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	return device->mmio[address];
+}
+
+void flashrom_pci_mmio_byte_write(struct flashrom_pci_device *device,
+				  off_t address, uint8_t value)
+{
+	if (address >= device->mmio_size) {
+		errno = EFAULT;
+		return;
+	}
+
+	device->mmio[address] = value;
+}
+
+void flashrom_pci_mmio_byte_mask(struct flashrom_pci_device *device,
+				 off_t address, uint8_t value, uint8_t mask)
+{
+	uint8_t temp;
+
+	if (address >= device->mmio_size) {
+		errno = EFAULT;
+		return;
+	}
+
+	value &= mask;
+
+	temp = device->mmio[address] & ~mask;
+	temp |= value & mask;
+
+	device->mmio[address] = temp;
+}
+
+uint32_t flashrom_pci_mmio_long_read(struct flashrom_pci_device *device,
+				     off_t address)
+{
+	volatile uint32_t *mmio = (volatile uint32_t *) &device->mmio[address];
+
+	if ((address >= device->mmio_size) || (address & 0x03)) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	return mmio[0];
+}
+
+void flashrom_pci_mmio_long_write(struct flashrom_pci_device *device,
+				  off_t address, uint32_t value)
+{
+	volatile uint32_t *mmio = (volatile uint32_t *) &device->mmio[address];
+
+	if ((address >= device->mmio_size) || (address & 0x03)) {
+		errno = EFAULT;
+		return;
+	}
+
+	mmio[0] = value;
+}
+
+void flashrom_pci_mmio_long_mask(struct flashrom_pci_device *device,
+				 off_t address, uint32_t value, uint32_t mask)
+{
+	volatile uint32_t *mmio = (volatile uint32_t *) &device->mmio[address];
+	uint32_t temp;
+
+	if ((address >= device->mmio_size) || (address & 0x03)) {
+		errno = EFAULT;
+		return;
+	}
+
+	value &= mask;
+
+	temp = mmio[0] & ~mask;
+	temp |= value & mask;
+
+	mmio[0] = temp;
+}

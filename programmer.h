@@ -877,6 +877,14 @@ struct flashrom_pci_device {
 struct flashrom_pci_device *flashrom_pci_init(const struct flashrom_pci_match *matches);
 int flashrom_pci_mmio_map(struct flashrom_pci_device *device, int bar);
 void flashrom_pci_mmio_unmap(struct flashrom_pci_device *device);
+
+uint8_t flashrom_pci_mmio_byte_read(struct flashrom_pci_device *device, off_t address);
+void flashrom_pci_mmio_byte_write(struct flashrom_pci_device *device, off_t address, uint8_t value);
+void flashrom_pci_mmio_byte_mask(struct flashrom_pci_device *device, off_t address, uint8_t value, uint8_t mask);
+
+uint32_t flashrom_pci_mmio_long_read(struct flashrom_pci_device *device, off_t address);
+void flashrom_pci_mmio_long_write(struct flashrom_pci_device *device, off_t address, uint32_t value);
+void flashrom_pci_mmio_long_mask(struct flashrom_pci_device *device, off_t address, uint32_t value, uint32_t mask);
 #endif /* NEED_PCI */
 
 #endif				/* !__PROGRAMMER_H__ */
