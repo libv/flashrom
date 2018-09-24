@@ -849,4 +849,29 @@ struct libusb_device_handle *usb_dev_get_by_vid_pid_serial(
 struct libusb_device_handle *usb_dev_get_by_vid_pid_number(
 		struct libusb_context *usb_ctx, uint16_t vid, uint16_t pid, unsigned int num);
 
+#if NEED_PCI == 1
+struct flashrom_pci_match {
+	uint16_t vendor_id;
+	uint16_t device_id;
+	const enum test_state status;
+	const void *private; /* programmer specific */
+};
+
+struct flashrom_pci_device {
+	char *name; /* created from pci info */
+
+	/* convenience copies */
+	uint16_t vendor_id;
+	uint16_t device_id;
+
+	struct pci_dev *pci;
+
+	char *sysfs_path; /* linux only, of course */
+
+	const void *private; /* programmer specific hook */
+};
+
+struct flashrom_pci_device *flashrom_pci_init(const struct flashrom_pci_match *matches);
+#endif /* NEED_PCI */
+
 #endif				/* !__PROGRAMMER_H__ */

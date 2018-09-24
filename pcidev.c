@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2009 Uwe Hermann <uwe@hermann-uwe.de>
  * Copyright (C) 2010, 2011 Carl-Daniel Hailfinger
+ * Copyright (C) 2018 Luc Verhaegen <libv@skynet.be>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -332,4 +333,143 @@ int rpci_write_long(struct pci_dev *dev, int reg, uint32_t data)
 {
 	register_undo_pci_write_long(dev, reg);
 	return pci_write_long(dev, reg, data);
+}
+
+/*
+ * This is reinvented pci device matching and access infrastructure which:
+ * - allows users to define a private which could be device specific.
+ *   This avoids doing multiple lookups, which massively helps the ati spi
+ *   driver which will support hundreds of devices.
+ * - uses linux sysfs pci infrastructure for enable/disable and mapping
+ *   resources. This circumvents the security restrictions surrounding
+ *   /dev/mem, but means that support for other operating systems still
+ *   needs to be cobbled together.
+ * - looks up device names through libpci, keeping us from maintaining a
+ *   separate names list.
+ *
+ */
+
+/*
+ *
+ */
+static int
+flashrom_pci_device_shutdown(void *data)
+{
+	struct flashrom_pci_device *device = data;
+
+	if (!device->sysfs_path) {
+		msg_perr("%s: Tried to cleanup an invalid pci_device!\n"
+			 "Please report a bug at flashrom@flashrom.org\n", __func__);
+		return 1;
+	}
+
+	free(device->sysfs_path);
+	device->sysfs_path = NULL;
+
+	free(device->name);
+	device->name = NULL;
+
+	device->private = NULL;
+	free(device);
+
+	return 0;
+}
+
+/*
+ *
+ */
+struct flashrom_pci_device *
+flashrom_pci_init(const struct flashrom_pci_match *matches)
+{
+	struct flashrom_pci_device *device;
+	struct pci_filter filter;
+	struct pci_dev *dev, *found_dev = NULL;
+	const struct flashrom_pci_match *found_match = NULL;
+	char *pcidev_bdf;
+	char buffer[1024], *name = NULL;
+	int i, found = 0;
+
+	if (pci_init_common())
+		return NULL;
+
+	pci_filter_init(pacc, &filter);
+
+	/* Filter by bb:dd.f (if supplied by the user). */
+	pcidev_bdf = extract_programmer_param("pci");
+	if (pcidev_bdf) {
+		char *msg;
+
+		if ((msg = pci_filter_parse_slot(&filter, pcidev_bdf))) {
+			msg_perr("Error: %s\n", msg);
+			return NULL;
+		}
+
+		free(pcidev_bdf);
+	}
+
+	for (dev = pacc->devices; dev; dev = dev->next)
+		if (pci_filter_match(&filter, dev)) {
+			for (i = 0; matches[i].vendor_id ; i++)
+				if ((dev->vendor_id == matches[i].vendor_id) &&
+				    (dev->device_id == matches[i].device_id))
+					break;
+
+			if (!matches[i].vendor_id)
+				continue;
+
+
+			name = pci_lookup_name(pacc, buffer, sizeof(buffer),
+					       PCI_LOOKUP_VENDOR | PCI_LOOKUP_DEVICE,
+					       dev->vendor_id, dev->device_id);
+			if (name)
+				msg_pinfo("Detected %04x:%04x@%02x:%02x.%x \"%s\"\n",
+					  dev->vendor_id, dev->device_id,
+					  dev->bus, dev->dev, dev->func, name);
+			else
+				msg_pinfo("Detected %04x:%04x@%02x:%02x.%x \"%s\"\n",
+					  dev->vendor_id, dev->device_id,
+					  dev->bus, dev->dev, dev->func,
+					  "<unknown pciids>");
+
+			if (matches[i].status == NT)
+				msg_pinfo("===\nThis PCI device is UNTESTED. Please report the 'flashrom -p "
+					  "xxxx' output\n"
+					  "to flashrom@flashrom.org if it works for you. Please add the name "
+					  "of your\n"
+					  "PCI device to the subject. Thank you for your help!\n===\n");
+
+			found_dev = dev;
+			found_match = &matches[i];
+			found++;
+		}
+
+	/* Only continue if exactly one supported PCI dev has been found. */
+	if (!found) {
+		msg_perr("Error: No supported PCI device found.\n");
+		return NULL;
+	} else if (found > 1) {
+		msg_perr("Error: Multiple supported PCI devices found. Use 'flashrom -p xxxx:pci=bb:dd.f'\n"
+			 "to explicitly select the card with the given BDF (PCI bus, device, function).\n");
+		return NULL;
+	}
+
+	device = calloc(1, sizeof(*device));
+
+	device->name = strdup(name);
+
+	device->device_id = found_dev->device_id;
+	device->vendor_id = found_dev->vendor_id;
+
+	device->pci = found_dev;
+
+	snprintf(buffer, sizeof(buffer) - 1,
+		 "/sys/bus/pci/devices/%04x:%02x:%02x.%01x/",
+		 0, found_dev->bus, found_dev->dev, found_dev->func);
+	device->sysfs_path = strdup(buffer);
+
+	device->private = found_match->private;
+
+	register_shutdown(flashrom_pci_device_shutdown, device);
+
+	return device;
 }
