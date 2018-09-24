@@ -37,9 +37,15 @@ int
 ati_spi_init(void)
 {
 	struct flashrom_pci_device *device;
+	const struct ati_spi_pci_private *private;
 
 	device = flashrom_pci_init(ati_spi_pci_devices);
 	if (!device)
+		return 1;
+
+	private = device->private;
+
+	if (flashrom_pci_mmio_map(device, private->io_bar))
 		return 1;
 
 	return 0;
