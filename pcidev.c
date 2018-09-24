@@ -18,6 +18,11 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
 #include "flash.h"
 #include "programmer.h"
 #include "hwaccess.h"
@@ -352,6 +357,69 @@ int rpci_write_long(struct pci_dev *dev, int reg, uint32_t data)
 /*
  *
  */
+int
+flashrom_pci_mmio_map(struct flashrom_pci_device *device, int bar)
+{
+	char filename[1024];
+	int fd;
+
+	if ((bar < 0) || (bar > 5)) {
+		msg_perr("%s: Invalid BAR provided: %d\n", __func__, bar);
+		return EINVAL;
+	}
+
+	if (device->mmio) {
+		if (device->pci->size[bar] != device->mmio_size) {
+			msg_perr("%s: already mapped bar: 0x%lXbytes @ %p)\n",
+				 __func__, device->mmio_size, device->mmio);
+			return EALREADY;
+		} else
+			return 0;
+	}
+
+	snprintf(filename, sizeof(filename) - 1,
+		 "%sresource%d", device->sysfs_path, bar);
+
+	fd = open(filename, O_RDWR);
+	if (fd == -1) {
+		msg_perr("%s: failed to open %s: %s\n",
+			 __func__, filename, strerror(errno));
+		return errno;
+	}
+
+	device->mmio_size = device->pci->size[bar];
+
+	device->mmio = mmap(NULL, device->mmio_size, PROT_WRITE | PROT_READ,
+			    MAP_SHARED, fd, 0);
+	if (device->mmio == MAP_FAILED) {
+		msg_perr("%s: mapping %s failed: %s\n",
+			 __func__, filename, strerror(errno));
+		close(fd);
+		device->mmio_size = 0;
+		return errno;
+	}
+
+	close(fd);
+
+	return 0;
+}
+
+/*
+ *
+ */
+void
+flashrom_pci_mmio_unmap(struct flashrom_pci_device *device)
+{
+	if (device->mmio && device->mmio_size &&
+	    (device->mmio != MAP_FAILED))
+		munmap((void *) device->mmio, device->mmio_size);
+	device->mmio = NULL;
+	device->mmio_size = 0;
+}
+
+/*
+ *
+ */
 static int
 flashrom_pci_device_shutdown(void *data)
 {
@@ -362,6 +430,8 @@ flashrom_pci_device_shutdown(void *data)
 			 "Please report a bug at flashrom@flashrom.org\n", __func__);
 		return 1;
 	}
+
+	flashrom_pci_mmio_unmap(device);
 
 	free(device->sysfs_path);
 	device->sysfs_path = NULL;

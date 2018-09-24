@@ -868,10 +868,15 @@ struct flashrom_pci_device {
 
 	char *sysfs_path; /* linux only, of course */
 
+	volatile uint8_t *mmio; /* mapped io memory */
+	size_t mmio_size;
+
 	const void *private; /* programmer specific hook */
 };
 
 struct flashrom_pci_device *flashrom_pci_init(const struct flashrom_pci_match *matches);
+int flashrom_pci_mmio_map(struct flashrom_pci_device *device, int bar);
+void flashrom_pci_mmio_unmap(struct flashrom_pci_device *device);
 #endif /* NEED_PCI */
 
 #endif				/* !__PROGRAMMER_H__ */
