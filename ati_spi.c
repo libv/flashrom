@@ -32,6 +32,7 @@ struct ati_spi_pci_private {
 
 	int (*save) (struct flashrom_pci_device *device);
 	int (*restore) (struct flashrom_pci_device *device);
+	int (*enable) (struct flashrom_pci_device *device);
 };
 
 #define R600_GENERAL_PWRMGT		0x0618
@@ -144,10 +145,42 @@ r600_spi_restore(struct flashrom_pci_device *device)
 	return 0;
 }
 
+/*
+ * Enable SPI Access.
+ */
+static int
+r600_spi_enable(struct flashrom_pci_device *device)
+{
+	msg_pdbg("%s();\n", __func__);
+
+	/* software enable clock gating and set sck divider to 1 */
+	mmio_mask(R600_ROM_CNTL, 0x10000002, 0xF0000002);
+
+	/* set gpio7,8,9 low */
+	mmio_mask(R600_GPIOPAD_A, 0, 0x0700);
+	/* gpio7 is input, gpio8/9 are output */
+	mmio_mask(R600_GPIOPAD_EN, 0x0600, 0x0700);
+	/* only allow software control on gpio7,8,9 */
+	mmio_mask(R600_GPIOPAD_MASK, 0x0700, 0x0700);
+
+	/* disable open drain pads */
+	mmio_mask(R600_GENERAL_PWRMGT, 0, 0x0800);
+
+	mmio_mask(R600_CTXSW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+	mmio_mask(R600_HIGH_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+	mmio_mask(R600_MEDIUM_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+	mmio_mask(R600_LOW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+
+	mmio_mask(R600_LOWER_GPIO_ENABLE, 0x0400, 0x0400);
+
+	return 0;
+}
+
 static const struct ati_spi_pci_private r600_spi_pci_private = {
 	.io_bar = 2,
 	.save = r600_spi_save,
 	.restore = r600_spi_restore,
+	.enable = r600_spi_enable,
 };
 
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
@@ -186,6 +219,10 @@ ati_spi_init(void)
 	register_shutdown(ati_spi_shutdown, device);
 
 	ret = private->save(device);
+	if (ret)
+		return ret;
+
+	ret = private->enable(device);
 	if (ret)
 		return ret;
 
