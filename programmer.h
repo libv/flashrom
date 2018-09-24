@@ -118,6 +118,9 @@ enum programmer {
 #if CONFIG_DIGILENT_SPI == 1
 	PROGRAMMER_DIGILENT_SPI,
 #endif
+#if CONFIG_ATI_SPI == 1
+	PROGRAMMER_ATI_SPI,
+#endif
 	PROGRAMMER_INVALID /* This must always be the last entry. */
 };
 
@@ -580,6 +583,12 @@ extern const struct dev_entry devs_ch341a_spi[];
 #if CONFIG_DIGILENT_SPI == 1
 int digilent_spi_init(void);
 extern const struct dev_entry devs_digilent_spi[];
+#endif
+
+/* ati_spi.c */
+#if CONFIG_ATI_SPI == 1
+int ati_spi_init(void);
+extern const struct flashrom_pci_match ati_spi_pci_devices[];
 #endif
 
 /* flashrom.c */

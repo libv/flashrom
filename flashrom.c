@@ -437,6 +437,18 @@ const struct programmer_entry programmer_table[] = {
 	},
 #endif
 
+#if CONFIG_ATI_SPI == 1
+	{
+		.name			= "ati_spi",
+		.type			= PCI2,
+		.devs.pci_match		= ati_spi_pci_devices,
+		.init			= ati_spi_init,
+		.map_flash_region	= fallback_map,
+		.unmap_flash_region	= fallback_unmap,
+		.delay			= internal_delay,
+	},
+#endif
+
 	{0}, /* This entry corresponds to PROGRAMMER_INVALID. */
 };
 

@@ -656,6 +656,9 @@ CONFIG_CH341A_SPI ?= yes
 # Digilent Development board JTAG
 CONFIG_DIGILENT_SPI ?= yes
 
+# ATI Radeon SPI
+CONFIG_ATI_SPI ?= yes
+
 # Disable wiki printing by default. It is only useful if you have wiki access.
 CONFIG_PRINT_WIKI ?= no
 
@@ -703,6 +706,7 @@ override CONFIG_NICINTEL_SPI = no
 override CONFIG_NICINTEL_EEPROM = no
 override CONFIG_OGP_SPI = no
 override CONFIG_SATAMV = no
+override CONFIG_ATI_SPI = no
 endif
 
 # Bitbanging SPI infrastructure, default off unless needed.
@@ -962,6 +966,12 @@ ifeq ($(CONFIG_DIGILENT_SPI), yes)
 FEATURE_CFLAGS += -D'CONFIG_DIGILENT_SPI=1'
 PROGRAMMER_OBJS += digilent_spi.o
 NEED_LIBUSB1 += CONFIG_DIGILENT_SPI
+endif
+
+ifeq ($(CONFIG_ATI_SPI), yes)
+FEATURE_CFLAGS += -D'CONFIG_ATI_SPI=1'
+PROGRAMMER_OBJS += ati_spi.o
+NEED_LIBPCI += CONFIG_ATI_SPI
 endif
 
 ifneq ($(NEED_SERIAL), )
