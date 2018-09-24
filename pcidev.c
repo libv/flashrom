@@ -547,10 +547,15 @@ flashrom_pci_device_shutdown(void *data)
 	free(device->sysfs_path);
 	device->sysfs_path = NULL;
 
+	if (device->private_data)
+		msg_perr("%s: device \"%s\"still has private data attached!\n"
+			 "Please report a bug at flashrom@flashrom.org\n",
+			 device->name, __func__);
+	device->private = NULL;
+
 	free(device->name);
 	device->name = NULL;
 
-	device->private = NULL;
 	free(device);
 
 	return 0;

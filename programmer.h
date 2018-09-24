@@ -871,7 +871,9 @@ struct flashrom_pci_device {
 	volatile uint8_t *mmio; /* mapped io memory */
 	size_t mmio_size;
 
-	const void *private; /* programmer specific hook */
+	/* programmer specifics */
+	const void *private; /* filled in from flashrom_pci_match */
+	void *private_data; /* alloced and freed by programmer */
 
 	/* housekeeping */
 	bool enabled;
