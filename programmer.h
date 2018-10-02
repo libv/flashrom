@@ -659,6 +659,9 @@ enum spi_controller {
 #if CONFIG_DIGILENT_SPI == 1
 	SPI_CONTROLLER_DIGILENT_SPI,
 #endif
+#if CONFIG_ATI_SPI == 1
+	SPI_CONTROLLER_ATI,
+#endif
 };
 
 #define MAX_DATA_UNSPECIFIED 0

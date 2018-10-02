@@ -24,6 +24,7 @@
 
 /* improve readability */
 #define mmio_read(reg) flashrom_pci_mmio_long_read(device, (reg))
+#define mmio_read_byte(reg) flashrom_pci_mmio_byte_read(device, (reg))
 #define mmio_write(reg, val) flashrom_pci_mmio_long_write(device, (reg), (val))
 #define mmio_mask(reg, val, mask) flashrom_pci_mmio_long_mask(device, (reg), (val), (mask))
 
@@ -33,6 +34,8 @@ struct ati_spi_pci_private {
 	int (*save) (struct flashrom_pci_device *device);
 	int (*restore) (struct flashrom_pci_device *device);
 	int (*enable) (struct flashrom_pci_device *device);
+
+	struct spi_master *master;
 };
 
 #define R600_GENERAL_PWRMGT		0x0618
@@ -45,13 +48,21 @@ struct ati_spi_pci_private {
 
 #define R600_ROM_CNTL			0x1600
 #define R600_PAGE_MIRROR_CNTL		0x1604
+#define R600_ROM_SW_CNTL		0x1618
 #define R600_ROM_SW_STATUS		0x161C
+#define R600_ROM_SW_COMMAND		0x1620
+#define R600_ROM_SW_DATA_0x00		0x1624
+/* ... */
+#define R600_ROM_SW_DATA_0xFC		0x1720
+#define R600_ROM_SW_DATA(off)		(R600_ROM_SW_DATA_0x00 + (off))
 
 #define R600_GPIOPAD_MASK		0x1798
 #define R600_GPIOPAD_A			0x179C
 #define R600_GPIOPAD_EN			0x17A0
 
 #define R600_ROM_SW_STATUS_LOOP_COUNT 1000
+
+#define R600_SPI_TRANSFER_SIZE 0x100
 
 struct r600_spi_data {
 	uint32_t reg_general_pwrmgt;
@@ -210,11 +221,114 @@ r600_spi_enable(struct flashrom_pci_device *device)
 	return 0;
 }
 
+/*
+ *
+ */
+static int
+r600_spi_command(struct flashctx *flash,
+		 unsigned int writecnt, unsigned int readcnt,
+		 const unsigned char *writearr, unsigned char *readarr)
+{
+	const struct spi_master spi_master = flash->mst->spi;
+	struct flashrom_pci_device *device =
+		(struct flashrom_pci_device *) spi_master.data;
+	uint32_t command, control;
+	int i, command_size;
+
+	msg_pdbg("%s(%p(%p), %d, %d, %p (0x%02X), %p);\n", __func__, flash,
+		 device, writecnt, readcnt, writearr, writearr[0], readarr);
+
+	if (!device) {
+		msg_perr("%s: no device specified!\n", __func__);
+		return -1;
+	}
+
+	command = writearr[0];
+	if (writecnt > 1)
+		command |= writearr[1] << 24;
+	if (writecnt > 2)
+		command |= writearr[2] << 16;
+	if (writecnt > 3)
+		command |= writearr[3] << 8;
+
+	if (writecnt < 4)
+		command_size = writecnt;
+	else
+		command_size = 4;
+
+	mmio_write(R600_ROM_SW_COMMAND, command);
+
+	/*
+	 * For some reason, we have an endianness difference between reading
+	 * and writing. Also, ati hw only does 32bit register write accesses.
+	 * If you write 8bits, the upper bytes will be nulled. Reading is fine.
+	 * Furthermore, due to flashrom infrastructure, we need to skip the
+	 * command in the writearr.
+	 */
+	for (i = 4; i < writecnt; i += 4) {
+		uint32_t value = 0;
+		int remainder = writecnt - i;
+
+		if (remainder > 4)
+			remainder = 4;
+
+		if (remainder > 0)
+			value |= writearr[i + 0] << 24;
+		if (remainder > 1)
+			value |= writearr[i + 1] << 16;
+		if (remainder > 2)
+			value |= writearr[i + 2] << 8;
+		if (remainder > 3)
+			value |= writearr[i + 3] << 0;
+
+		mmio_write(R600_ROM_SW_DATA(i - 4), value);
+	}
+
+	control = (command_size - 1) << 0x10;
+	if (readcnt)
+		control |= 0x40000 | readcnt;
+	else if (writecnt > 4)
+		control |= writecnt - 4;
+	mmio_write(R600_ROM_SW_CNTL, control);
+
+	for (i = 0; i < R600_ROM_SW_STATUS_LOOP_COUNT; i++) {
+		if (mmio_read(R600_ROM_SW_STATUS))
+			break;
+		programmer_delay(1000);
+	}
+
+	if (i == R600_ROM_SW_STATUS_LOOP_COUNT) {
+		msg_perr("%s: still waiting for R600_ROM_SW_STATUS\n",
+			 __func__);
+		return -1;
+	}
+	mmio_write(R600_ROM_SW_STATUS, 0);
+
+	for (i = 0; i < readcnt; i++)
+		readarr[i] = mmio_read_byte(R600_ROM_SW_DATA(i));
+
+	return 0;
+}
+
+static struct spi_master r600_spi_master = {
+	.type = SPI_CONTROLLER_ATI,
+	.features = 0,
+	.max_data_read = R600_SPI_TRANSFER_SIZE,
+	.max_data_write = R600_SPI_TRANSFER_SIZE + 1,
+	.command = r600_spi_command,
+	.multicommand = default_spi_send_multicommand,
+	.read = default_spi_read,
+	.write_256 = default_spi_write_256,
+	.write_aai = default_spi_write_aai,
+	.data = NULL, /* make this our flashrom_pci_device... */
+};
+
 static const struct ati_spi_pci_private r600_spi_pci_private = {
 	.io_bar = 2,
 	.save = r600_spi_save,
 	.restore = r600_spi_restore,
 	.enable = r600_spi_enable,
+	.master = &r600_spi_master,
 };
 
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
@@ -259,6 +373,10 @@ ati_spi_init(void)
 	ret = private->enable(device);
 	if (ret)
 		return ret;
+
+	private->master->data = device;
+	if (register_spi_master(private->master))
+		return 1;
 
 	return 0;
 }
