@@ -44,10 +44,14 @@ struct ati_spi_pci_private {
 #define R600_LOW_VID_LOWER_GPIO_CNTL	0x0724
 
 #define R600_ROM_CNTL			0x1600
+#define R600_PAGE_MIRROR_CNTL		0x1604
+#define R600_ROM_SW_STATUS		0x161C
 
 #define R600_GPIOPAD_MASK		0x1798
 #define R600_GPIOPAD_A			0x179C
 #define R600_GPIOPAD_EN			0x17A0
+
+#define R600_ROM_SW_STATUS_LOOP_COUNT 1000
 
 struct r600_spi_data {
 	uint32_t reg_general_pwrmgt;
@@ -58,6 +62,7 @@ struct r600_spi_data {
 	uint32_t reg_low_vid_lower_gpio_cntl;
 
 	uint32_t reg_rom_cntl;
+	uint32_t reg_page_mirror_cntl;
 	uint32_t reg_gpiopad_mask;
 	uint32_t reg_gpiopad_a;
 	uint32_t reg_gpiopad_en;
@@ -94,6 +99,7 @@ r600_spi_save(struct flashrom_pci_device *device)
 		mmio_read(R600_LOW_VID_LOWER_GPIO_CNTL);
 
 	data->reg_rom_cntl = mmio_read(R600_ROM_CNTL);
+	data->reg_page_mirror_cntl = mmio_read(R600_PAGE_MIRROR_CNTL);
 
 	data->reg_gpiopad_mask = mmio_read(R600_GPIOPAD_MASK);
 	data->reg_gpiopad_a = mmio_read(R600_GPIOPAD_A);
@@ -139,6 +145,8 @@ r600_spi_restore(struct flashrom_pci_device *device)
 
 	mmio_write(R600_LOWER_GPIO_ENABLE, data->reg_lower_gpio_enable);
 
+	mmio_write(R600_PAGE_MIRROR_CNTL, data->reg_page_mirror_cntl);
+
 	free(data);
 	device->private_data = NULL;
 
@@ -151,6 +159,8 @@ r600_spi_restore(struct flashrom_pci_device *device)
 static int
 r600_spi_enable(struct flashrom_pci_device *device)
 {
+	int i;
+
 	msg_pdbg("%s();\n", __func__);
 
 	/* software enable clock gating and set sck divider to 1 */
@@ -172,6 +182,30 @@ r600_spi_enable(struct flashrom_pci_device *device)
 	mmio_mask(R600_LOW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
 
 	mmio_mask(R600_LOWER_GPIO_ENABLE, 0x0400, 0x0400);
+
+	programmer_delay(1000);
+
+	mmio_mask(R600_GPIOPAD_MASK, 0, 0x700);
+	mmio_mask(R600_GPIOPAD_EN, 0, 0x700);
+	mmio_mask(R600_GPIOPAD_A, 0, 0x00080000);
+
+	/* page mirror usage */
+	mmio_mask(R600_PAGE_MIRROR_CNTL, 0x04000000, 0x0C000000);
+
+	if (mmio_read(R600_ROM_SW_STATUS)) {
+		for (i = 0; i < R600_ROM_SW_STATUS_LOOP_COUNT; i++) {
+			mmio_write(R600_ROM_SW_STATUS, 0);
+			programmer_delay(1000);
+			if (!mmio_read(R600_ROM_SW_STATUS))
+				break;
+		}
+
+		if (i == R600_ROM_SW_STATUS_LOOP_COUNT) {
+			msg_perr("%s: failed to clear R600_ROM_SW_STATUS\n",
+				 __func__);
+			return -1;
+		}
+	}
 
 	return 0;
 }
