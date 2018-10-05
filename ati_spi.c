@@ -28,8 +28,15 @@
 #define mmio_write(reg, val) flashrom_pci_mmio_long_write(device, (reg), (val))
 #define mmio_mask(reg, val, mask) flashrom_pci_mmio_long_mask(device, (reg), (val), (mask))
 
+enum ati_spi_type {
+	ATI_SPI_TYPE_R600 = 1,
+	ATI_SPI_TYPE_RV730,
+};
+
 struct ati_spi_pci_private {
 	int io_bar;
+
+	enum ati_spi_type type;
 
 	int (*save) (struct flashrom_pci_device *device);
 	int (*restore) (struct flashrom_pci_device *device);
@@ -170,12 +177,17 @@ r600_spi_restore(struct flashrom_pci_device *device)
 static int
 r600_spi_enable(struct flashrom_pci_device *device)
 {
+	const struct ati_spi_pci_private *private = device->private;
 	int i;
 
 	msg_pdbg("%s();\n", __func__);
 
-	/* software enable clock gating and set sck divider to 1 */
-	mmio_mask(R600_ROM_CNTL, 0x10000002, 0xF0000002);
+	if (private->type == ATI_SPI_TYPE_RV730)
+		/* As below, but also set the (unused?) pcie clk divider */
+		mmio_mask(R600_ROM_CNTL, 0x19000002, 0xFF000002);
+	else
+		/* software enable clock gating and set sck divider to 1 */
+		mmio_mask(R600_ROM_CNTL, 0x10000002, 0xF0000002);
 
 	/* set gpio7,8,9 low */
 	mmio_mask(R600_GPIOPAD_A, 0, 0x0700);
@@ -329,6 +341,19 @@ static struct spi_master r600_spi_master = {
  */
 static const struct ati_spi_pci_private r600_spi_pci_private = {
 	.io_bar = 2,
+	.type = ATI_SPI_TYPE_R600,
+	.save = r600_spi_save,
+	.restore = r600_spi_restore,
+	.enable = r600_spi_enable,
+	.master = &r600_spi_master,
+};
+
+/*
+ * Used by RV730/RV740.
+ */
+static const struct ati_spi_pci_private rv730_spi_pci_private = {
+	.io_bar = 2,
+	.type = ATI_SPI_TYPE_RV730,
 	.save = r600_spi_save,
 	.restore = r600_spi_restore,
 	.enable = r600_spi_enable,
@@ -361,6 +386,21 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x9460, NT, &r600_spi_pci_private},
 	{0x1002, 0x9462, NT, &r600_spi_pci_private},
 	{0x1002, 0x946A, NT, &r600_spi_pci_private},
+	{0x1002, 0x9480, NT, &rv730_spi_pci_private},
+	{0x1002, 0x9488, NT, &rv730_spi_pci_private},
+	{0x1002, 0x9489, NT, &rv730_spi_pci_private},
+	{0x1002, 0x9490, NT, &rv730_spi_pci_private},
+	{0x1002, 0x9491, NT, &rv730_spi_pci_private},
+	{0x1002, 0x9495, NT, &rv730_spi_pci_private},
+	{0x1002, 0x9498, NT, &rv730_spi_pci_private},
+	{0x1002, 0x949C, NT, &rv730_spi_pci_private},
+	{0x1002, 0x949E, NT, &rv730_spi_pci_private},
+	{0x1002, 0x949F, NT, &rv730_spi_pci_private},
+	{0x1002, 0x94A0, NT, &rv730_spi_pci_private},
+	{0x1002, 0x94A1, NT, &rv730_spi_pci_private},
+	{0x1002, 0x94A3, NT, &rv730_spi_pci_private},
+	{0x1002, 0x94B3, NT, &rv730_spi_pci_private},
+	{0x1002, 0x94B4, NT, &rv730_spi_pci_private},
 	{0x1002, 0x94C1, NT, &r600_spi_pci_private},
 	{0x1002, 0x94C3, OK, &r600_spi_pci_private},
 	{0x1002, 0x94C4, NT, &r600_spi_pci_private},
