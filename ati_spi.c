@@ -323,6 +323,10 @@ static struct spi_master r600_spi_master = {
 	.data = NULL, /* make this our flashrom_pci_device... */
 };
 
+/*
+ * Used by all Rx6xx and RV710/RV770/RV710. RV730/RV740 use a slightly
+ * different enable.
+ */
 static const struct ati_spi_pci_private r600_spi_pci_private = {
 	.io_bar = 2,
 	.save = r600_spi_save,
@@ -340,6 +344,23 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x940A, NT, &r600_spi_pci_private},
 	{0x1002, 0x940B, NT, &r600_spi_pci_private},
 	{0x1002, 0x940F, NT, &r600_spi_pci_private},
+	{0x1002, 0x9440, NT, &r600_spi_pci_private},
+	{0x1002, 0x9441, NT, &r600_spi_pci_private},
+	{0x1002, 0x9442, NT, &r600_spi_pci_private},
+	{0x1002, 0x9443, NT, &r600_spi_pci_private},
+	{0x1002, 0x9444, NT, &r600_spi_pci_private},
+	{0x1002, 0x9446, NT, &r600_spi_pci_private},
+	{0x1002, 0x944A, NT, &r600_spi_pci_private},
+	{0x1002, 0x944B, NT, &r600_spi_pci_private},
+	{0x1002, 0x944C, NT, &r600_spi_pci_private},
+	{0x1002, 0x944e, NT, &r600_spi_pci_private},
+	{0x1002, 0x9450, NT, &r600_spi_pci_private},
+	{0x1002, 0x9452, NT, &r600_spi_pci_private},
+	{0x1002, 0x9456, NT, &r600_spi_pci_private},
+	{0x1002, 0x945A, NT, &r600_spi_pci_private},
+	{0x1002, 0x9460, NT, &r600_spi_pci_private},
+	{0x1002, 0x9462, NT, &r600_spi_pci_private},
+	{0x1002, 0x946A, NT, &r600_spi_pci_private},
 	{0x1002, 0x94C1, NT, &r600_spi_pci_private},
 	{0x1002, 0x94C3, OK, &r600_spi_pci_private},
 	{0x1002, 0x94C4, NT, &r600_spi_pci_private},
@@ -363,6 +384,13 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x9513, NT, &r600_spi_pci_private},
 	{0x1002, 0x9515, NT, &r600_spi_pci_private},
 	{0x1002, 0x9519, NT, &r600_spi_pci_private},
+	{0x1002, 0x9540, NT, &r600_spi_pci_private},
+	{0x1002, 0x954F, NT, &r600_spi_pci_private},
+	{0x1002, 0x9552, NT, &r600_spi_pci_private},
+	{0x1002, 0x9553, NT, &r600_spi_pci_private},
+	{0x1002, 0x9555, NT, &r600_spi_pci_private},
+	{0x1002, 0x9557, NT, &r600_spi_pci_private},
+	{0x1002, 0x955F, NT, &r600_spi_pci_private},
 	{0x1002, 0x9580, NT, &r600_spi_pci_private},
 	{0x1002, 0x9581, NT, &r600_spi_pci_private},
 	{0x1002, 0x9583, NT, &r600_spi_pci_private},
