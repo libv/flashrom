@@ -31,6 +31,7 @@
 enum ati_spi_type {
 	ATI_SPI_TYPE_R600 = 1,
 	ATI_SPI_TYPE_RV730,
+	ATI_SPI_TYPE_EVERGREEN,
 };
 
 struct ati_spi_pci_private {
@@ -204,7 +205,8 @@ r600_spi_enable(struct flashrom_pci_device *device)
 	mmio_mask(R600_MEDIUM_VID_LOWER_GPIO_CNTL, 0, 0x0400);
 	mmio_mask(R600_LOW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
 
-	mmio_mask(R600_LOWER_GPIO_ENABLE, 0x0400, 0x0400);
+	if (private->type != ATI_SPI_TYPE_EVERGREEN)
+		mmio_mask(R600_LOWER_GPIO_ENABLE, 0x0400, 0x0400);
 
 	programmer_delay(1000);
 
@@ -360,7 +362,61 @@ static const struct ati_spi_pci_private rv730_spi_pci_private = {
 	.master = &r600_spi_master,
 };
 
+/*
+ * Used by Cypress, Juniper, Redwood and Cedar.
+ */
+static const struct ati_spi_pci_private evergreen_spi_pci_private = {
+	.io_bar = 2,
+	.type = ATI_SPI_TYPE_EVERGREEN,
+	.save = r600_spi_save,
+	.restore = r600_spi_restore,
+	.enable = r600_spi_enable,
+	.master = &r600_spi_master,
+};
+
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
+	{0x1002, 0x6880, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x6888, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x6889, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x688A, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x688C, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x688D, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x6898, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x6899, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x689B, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x689C, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x689D, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x689E, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68A0, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68A1, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68A8, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68A9, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68B8, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68B9, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68BA, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68BE, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68BF, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68C0, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68C1, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68C7, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68C8, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68C9, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68D8, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68D9, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68DA, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68DE, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68E0, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68E1, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68E4, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68E5, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68E8, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68E9, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68F1, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68F2, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68F8, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68F9, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68FA, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x68FE, NT, &evergreen_spi_pci_private},
 	{0x1002, 0x9400, NT, &r600_spi_pci_private},
 	{0x1002, 0x9401, NT, &r600_spi_pci_private},
 	{0x1002, 0x9402, NT, &r600_spi_pci_private},
