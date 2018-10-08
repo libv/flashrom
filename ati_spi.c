@@ -32,6 +32,7 @@ enum ati_spi_type {
 	ATI_SPI_TYPE_R600 = 1,
 	ATI_SPI_TYPE_RV730,
 	ATI_SPI_TYPE_EVERGREEN,
+	ATI_SPI_TYPE_NORTHERN_ISLAND,
 };
 
 struct ati_spi_pci_private {
@@ -190,6 +191,16 @@ r600_spi_enable(struct flashrom_pci_device *device)
 		/* software enable clock gating and set sck divider to 1 */
 		mmio_mask(R600_ROM_CNTL, 0x10000002, 0xF0000002);
 
+	if (private->type == ATI_SPI_TYPE_NORTHERN_ISLAND) {
+		/*
+		 * Probably some other gpio lines...
+		 * These are not restored by ATIs own tool.
+		 */
+		mmio_mask(0x64A0, 0x100, 0x100);
+		mmio_mask(0x64A8, 0x100, 0x100);
+		mmio_mask(0x64A4, 0x100, 0x100);
+	}
+
 	/* set gpio7,8,9 low */
 	mmio_mask(R600_GPIOPAD_A, 0, 0x0700);
 	/* gpio7 is input, gpio8/9 are output */
@@ -205,7 +216,8 @@ r600_spi_enable(struct flashrom_pci_device *device)
 	mmio_mask(R600_MEDIUM_VID_LOWER_GPIO_CNTL, 0, 0x0400);
 	mmio_mask(R600_LOW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
 
-	if (private->type != ATI_SPI_TYPE_EVERGREEN)
+	if ((private->type == ATI_SPI_TYPE_R600) ||
+	    (private->type == ATI_SPI_TYPE_RV730))
 		mmio_mask(R600_LOWER_GPIO_ENABLE, 0x0400, 0x0400);
 
 	programmer_delay(1000);
@@ -374,7 +386,57 @@ static const struct ati_spi_pci_private evergreen_spi_pci_private = {
 	.master = &r600_spi_master,
 };
 
+/*
+ * Used by Cayman, Barts, Turks, and Caicos.
+ */
+static const struct ati_spi_pci_private northern_island_spi_pci_private = {
+	.io_bar = 2,
+	.type = ATI_SPI_TYPE_NORTHERN_ISLAND,
+	.save = r600_spi_save,
+	.restore = r600_spi_restore,
+	.enable = r600_spi_enable,
+	.master = &r600_spi_master,
+};
+
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
+	{0x1002, 0x6704, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6707, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6718, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6719, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x671C, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x671D, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x671F, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6720, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6738, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6739, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x673E, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6740, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6741, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6742, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6743, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6749, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x674A, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6750, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6751, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6758, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6759, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x675b, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x675d, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x675f, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6760, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6761, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6763, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6764, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6765, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6766, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6767, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6768, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6770, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6771, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6772, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6778, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6779, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x677B, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x6880, NT, &evergreen_spi_pci_private},
 	{0x1002, 0x6888, NT, &evergreen_spi_pci_private},
 	{0x1002, 0x6889, NT, &evergreen_spi_pci_private},
