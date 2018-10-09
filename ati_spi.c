@@ -33,6 +33,7 @@ enum ati_spi_type {
 	ATI_SPI_TYPE_RV730,
 	ATI_SPI_TYPE_EVERGREEN,
 	ATI_SPI_TYPE_NORTHERN_ISLAND,
+	ATI_SPI_TYPE_SOUTHERN_ISLAND,
 };
 
 struct ati_spi_pci_private {
@@ -211,10 +212,15 @@ r600_spi_enable(struct flashrom_pci_device *device)
 	/* disable open drain pads */
 	mmio_mask(R600_GENERAL_PWRMGT, 0, 0x0800);
 
-	mmio_mask(R600_CTXSW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
-	mmio_mask(R600_HIGH_VID_LOWER_GPIO_CNTL, 0, 0x0400);
-	mmio_mask(R600_MEDIUM_VID_LOWER_GPIO_CNTL, 0, 0x0400);
-	mmio_mask(R600_LOW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+	if ((private->type == ATI_SPI_TYPE_R600) ||
+	    (private->type == ATI_SPI_TYPE_RV730) ||
+	    (private->type == ATI_SPI_TYPE_EVERGREEN) ||
+	    (private->type == ATI_SPI_TYPE_NORTHERN_ISLAND)) {
+		mmio_mask(R600_CTXSW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+		mmio_mask(R600_HIGH_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+		mmio_mask(R600_MEDIUM_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+		mmio_mask(R600_LOW_VID_LOWER_GPIO_CNTL, 0, 0x0400);
+	}
 
 	if ((private->type == ATI_SPI_TYPE_R600) ||
 	    (private->type == ATI_SPI_TYPE_RV730))
@@ -398,6 +404,19 @@ static const struct ati_spi_pci_private northern_island_spi_pci_private = {
 	.master = &r600_spi_master,
 };
 
+/*
+ * Used by Lombok.
+ * Verde, Pitcairn, Hainan and Oland are pending.
+ */
+static const struct ati_spi_pci_private southern_island_spi_pci_private = {
+	.io_bar = 2,
+	.type = ATI_SPI_TYPE_SOUTHERN_ISLAND,
+	.save = r600_spi_save,
+	.restore = r600_spi_restore,
+	.enable = r600_spi_enable,
+	.master = &r600_spi_master,
+};
+
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x6704, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x6707, NT, &northern_island_spi_pci_private},
@@ -437,6 +456,10 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x6778, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x6779, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x677B, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x6840, NT, &southern_island_spi_pci_private},
+	{0x1002, 0x6841, NT, &southern_island_spi_pci_private},
+	{0x1002, 0x6842, NT, &southern_island_spi_pci_private},
+	{0x1002, 0x6843, NT, &southern_island_spi_pci_private},
 	{0x1002, 0x6880, NT, &evergreen_spi_pci_private},
 	{0x1002, 0x6888, NT, &evergreen_spi_pci_private},
 	{0x1002, 0x6889, NT, &evergreen_spi_pci_private},
