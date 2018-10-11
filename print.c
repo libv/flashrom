@@ -19,6 +19,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#if NEED_PCI == 1
+#include <pci/pci.h>
+#endif
+
 #include "flash.h"
 #include "programmer.h"
 
@@ -462,6 +467,61 @@ void print_supported_devs(const struct programmer_entry prog, const char *const 
 	}
 }
 
+#if NEED_PCI == 1
+/*
+ * We depend on libpcis built in list of names here. This makes formatting
+ * tricky/ugly.
+ * libpcis device only name lookup is currently not reliable, so look up the
+ * whole tuple.
+ */
+void print_supported_flashrom_pci_devices(const struct programmer_entry prog)
+{
+#define PAD_LENGTH 64
+	const struct flashrom_pci_match *matches = prog.devs.pci_match;
+	char buffer[256], *name;
+	unsigned int i, j, len;
+
+	/* try to use already initialized pci_access structure */
+	if (!pacc) {
+		pacc = pci_alloc();
+		if (!pacc) {
+			msg_gerr("%s: Failed to allocate pci_access "
+				 "structure.\n", __func__);
+			return;
+		}
+		pci_init(pacc);
+
+		pci_load_name_list(pacc);
+	}
+
+	msg_ginfo("\nSupported PCI devices for the %s programmer:\n",
+		  prog.name);
+
+	len = msg_ginfo("Vendor - Device");
+	if (len < PAD_LENGTH)
+		for (j = 0;  j < (PAD_LENGTH - len); j++)
+			msg_ginfo(" ");
+	msg_ginfo("\tPCI IDS    Status\n");
+
+	for (i = 0; matches[i].vendor_id; i++) {
+		name = pci_lookup_name(pacc, buffer, sizeof(buffer),
+				       PCI_LOOKUP_VENDOR | PCI_LOOKUP_DEVICE,
+				       matches[i].vendor_id,
+				       matches[i].device_id);
+		len = msg_pinfo("%s", name);
+		if (len < PAD_LENGTH)
+			for (j = 0;  j < (PAD_LENGTH - len); j++)
+				msg_pinfo(" ");
+		msg_pinfo("\t%04x:%04x  %s\n",
+			  matches[i].vendor_id, matches[i].device_id,
+			  test_state_to_text(matches[i].status));
+	}
+
+	/* Don't bother cleaning up pacc, we either reuse it, or exit() */
+}
+#endif /* NEED_PCI */
+
+
 int print_supported(void)
 {
 	unsigned int i;
@@ -489,6 +549,11 @@ int print_supported(void)
 		case PCI:
 			print_supported_devs(prog, "PCI");
 			break;
+#if NEED_PCI == 1
+		case PCI2:
+			print_supported_flashrom_pci_devices(prog);
+			break;
+#endif /* NEED_PCI */
 		case OTHER:
 			if (prog.devs.note != NULL) {
 				msg_ginfo("\nSupported devices for the %s programmer:\n", prog.name);

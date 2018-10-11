@@ -2098,6 +2098,7 @@ int selfcheck(void)
 		switch (p.type) {
 		case USB:
 		case PCI:
+		case PCI2:
 		case OTHER:
 			if (p.devs.note == NULL) {
 				if (strcmp("internal", p.name) == 0)

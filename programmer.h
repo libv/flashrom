@@ -123,6 +123,7 @@ enum programmer {
 
 enum programmer_type {
 	PCI = 1, /* to detect uninitialized values */
+	PCI2, /* different pci infrastructure */
 	USB,
 	OTHER,
 };
@@ -135,12 +136,20 @@ struct dev_entry {
 	const char *device_name;
 };
 
+struct flashrom_pci_match {
+	uint16_t vendor_id;
+	uint16_t device_id;
+	const enum test_state status;
+	const void *private; /* programmer specific */
+};
+
 struct programmer_entry {
 	const char *name;
 	const enum programmer_type type;
 	union {
 		const struct dev_entry *const dev;
 		const char *const note;
+		const struct flashrom_pci_match *pci_match;
 	} devs;
 
 	int (*init) (void);
@@ -850,13 +859,6 @@ struct libusb_device_handle *usb_dev_get_by_vid_pid_number(
 		struct libusb_context *usb_ctx, uint16_t vid, uint16_t pid, unsigned int num);
 
 #if NEED_PCI == 1
-struct flashrom_pci_match {
-	uint16_t vendor_id;
-	uint16_t device_id;
-	const enum test_state status;
-	const void *private; /* programmer specific */
-};
-
 struct flashrom_pci_device {
 	char *name; /* created from pci info */
 
