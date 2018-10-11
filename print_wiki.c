@@ -19,6 +19,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+
+#if NEED_PCI == 1
+#include <pci/pci.h>
+#endif
+
 #include "flash.h"
 #include "flashchips.h"
 #include "programmer.h"
@@ -355,24 +360,103 @@ static int count_supported_devs_wiki(const struct dev_entry *devs)
 	return count;
 }
 
+static char *vendor_colour_get(void)
+{
+	static bool vendor_colour = false;
+
+	/* Alternate colors if the vendor changes. */
+	vendor_colour = !vendor_colour;
+
+	if (vendor_colour)
+		return "eeeeee";
+	else
+		return "dddddd";
+}
+
 static void print_supported_devs_wiki_helper(const struct programmer_entry prog)
 {
 	int i = 0;
-	static int c = 0;
 	const struct dev_entry *devs = prog.devs.dev;
 	const unsigned int count = count_supported_devs_wiki(devs);
-
-	/* Alternate colors if the vendor changes. */
-	c = !c;
+	char *colour = vendor_colour_get();
 
 	for (i = 0; devs[i].vendor_id != 0; i++) {
-		printf("|- bgcolor=\"#%s\"\n", (c) ? "eeeeee" : "dddddd");
+		printf("|- bgcolor=\"#%s\"\n", colour);
 		if (i == 0)
 			printf("| rowspan=\"%u\" | %s |", count, prog.name);
 		printf("| %s || %s || %04x:%04x || {{%s}}\n", devs[i].vendor_name, devs[i].device_name,
 		       devs[i].vendor_id, devs[i].device_id, test_state_to_template(devs[i].status));
 	}
 }
+
+#if NEED_PCI == 1
+static int count_supported_pci_matches_wiki(const struct flashrom_pci_match *matches)
+{
+	int i;
+
+	for (i = 0; matches[i].vendor_id; i++)
+		;
+
+	return i;
+}
+
+/*
+ * libpci lookup_name(PCI_LOOKUP_DEVICE) is currently not reliable.
+ * We need to work around this.
+ */
+static void print_supported_pci_matches_wiki_helper(const struct programmer_entry prog)
+{
+	const struct flashrom_pci_match *matches = prog.devs.pci_match;
+	char *colour = vendor_colour_get();
+	int i, count = count_supported_pci_matches_wiki(matches);
+	int vendor_length = 0;
+	uint16_t vendor_id = 0;
+	char vendor_buffer[256], *vendor_name = NULL;
+	char device_buffer[256], *device_name;
+
+	/* try to use already initialized pci_access structure */
+	if (!pacc) {
+		pacc = pci_alloc();
+		if (!pacc) {
+			msg_gerr("%s: Failed to allocate pci_access "
+				 "structure.\n", __func__);
+			return;
+		}
+		pci_init(pacc);
+
+		pci_load_name_list(pacc);
+	}
+
+	for (i = 0; matches[i].vendor_id; i++) {
+		if (matches[i].vendor_id != vendor_id) {
+			vendor_name = pci_lookup_name(pacc, vendor_buffer,
+						      sizeof(vendor_buffer),
+						      PCI_LOOKUP_VENDOR,
+						      matches[i].vendor_id);
+			vendor_length = strlen(vendor_name);
+			vendor_id = matches[i].vendor_id;
+		}
+
+		device_name =
+			pci_lookup_name(pacc, device_buffer,
+					sizeof(device_buffer),
+					PCI_LOOKUP_VENDOR | PCI_LOOKUP_DEVICE,
+					matches[i].vendor_id,
+					matches[i].device_id);
+		device_name += vendor_length + 1;
+
+		printf("|- bgcolor=\"#%s\"\n", colour);
+		if (!i)
+			printf("| rowspan=\"%u\" | %s |", count, prog.name);
+		printf("| %s || %s || %04x:%04x || {{%s}}\n",
+		       vendor_name, device_name,
+		       matches[i].vendor_id, matches[i].device_id,
+		       test_state_to_template(matches[i].status));
+	}
+
+	/* Don't bother cleaning up pacc, we either reuse it, or exit() */
+}
+#endif /* NEED_PCI */
 
 static void print_supported_devs_wiki()
 {
@@ -389,6 +473,11 @@ static void print_supported_devs_wiki()
 		case PCI:
 			pci_count += count_supported_devs_wiki(prog.devs.dev);
 			break;
+#if NEED_PCI == 1
+		case PCI2:
+			pci_count += count_supported_pci_matches_wiki(prog.devs.pci_match);
+			break;
+#endif /* NEED_PCI */
 		case OTHER:
 		default:
 			break;
@@ -401,9 +490,12 @@ static void print_supported_devs_wiki()
 
 	for (i = 0; i < PROGRAMMER_INVALID; i++) {
 		const struct programmer_entry prog = programmer_table[i];
-		if (prog.type == PCI) {
+		if (prog.type == PCI)
 			print_supported_devs_wiki_helper(prog);
-		}
+#if NEED_PCI == 1
+		else if (prog.type == PCI2)
+			print_supported_pci_matches_wiki_helper(prog);
+#endif /* NEED_PCI */
 	}
 	printf("\n|}\n\n|}\n");
 
