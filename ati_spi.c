@@ -423,10 +423,47 @@ static const struct ati_spi_pci_private southern_island_spi_pci_private = {
  */
 #define CI_MMIO_BAR			5
 
+#define CI_SMC1_INDEX			0x0208
+#define CI_SMC1_DATA			0x020C
+
+#define CI_GPIOPAD_MASK			0x0608
+#define CI_GPIOPAD_A			0x060C
+#define CI_GPIOPAD_EN			0x0610
+
+#define CI_DRM_ID_STRAPS		0x5564
+
+#define CI_GENERAL_PWRMGT		0xC0200000
+
+#define CI_ROM_CNTL			0xC0600000
+#define CI_PAGE_MIRROR_CNTL		0xC0600004
+
 #define CI_SPI_TRANSFER_SIZE 0x100
 
+static uint32_t
+_ci_smc_read(struct flashrom_pci_device *device, off_t address)
+{
+	mmio_write(CI_SMC1_INDEX, address);
+	return mmio_read(CI_SMC1_DATA);
+}
+#define smc_read(reg) _ci_smc_read(device, (reg))
+
+static void
+_ci_smc_write(struct flashrom_pci_device *device, off_t address, uint32_t value)
+{
+	mmio_write(CI_SMC1_INDEX, address);
+	mmio_write(CI_SMC1_DATA, value);
+}
+#define smc_write(reg, val) _ci_smc_write(device, (reg), (val))
+
 struct ci_spi_data {
-	uint32_t empty;
+	uint32_t reg_gpiopad_mask;
+	uint32_t reg_gpiopad_a;
+	uint32_t reg_gpiopad_en;
+
+	uint32_t reg_general_pwrmgt;
+
+	uint32_t reg_rom_cntl;
+	uint32_t reg_page_mirror_cntl;
 };
 
 /*
@@ -446,6 +483,15 @@ ci_spi_save(struct flashrom_pci_device *device)
 	}
 
 	data = calloc(1, sizeof(struct ci_spi_data));
+
+	data->reg_general_pwrmgt = smc_read(CI_GENERAL_PWRMGT);
+
+	data->reg_rom_cntl = smc_read(CI_ROM_CNTL);
+	data->reg_page_mirror_cntl = smc_read(CI_PAGE_MIRROR_CNTL);
+
+	data->reg_gpiopad_mask = mmio_read(CI_GPIOPAD_MASK);
+	data->reg_gpiopad_a = mmio_read(CI_GPIOPAD_A);
+	data->reg_gpiopad_en = mmio_read(CI_GPIOPAD_EN);
 
 	device->private_data = data;
 
@@ -467,6 +513,16 @@ ci_spi_restore(struct flashrom_pci_device *device)
 			 __func__);
 		return -1;
 	}
+
+	smc_write(CI_ROM_CNTL, data->reg_rom_cntl);
+
+	mmio_write(CI_GPIOPAD_A, data->reg_gpiopad_a);
+	mmio_write(CI_GPIOPAD_EN, data->reg_gpiopad_en);
+	mmio_write(CI_GPIOPAD_MASK, data->reg_gpiopad_mask);
+
+	smc_write(CI_GENERAL_PWRMGT, data->reg_general_pwrmgt);
+
+	smc_write(CI_PAGE_MIRROR_CNTL, data->reg_page_mirror_cntl);
 
 	free(data);
 	device->private_data = NULL;
