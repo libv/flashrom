@@ -34,7 +34,8 @@ enum ati_spi_type {
 	ATI_SPI_TYPE_EVERGREEN,
 	ATI_SPI_TYPE_NORTHERN_ISLAND,
 	ATI_SPI_TYPE_SOUTHERN_ISLAND,
-	ATI_SPI_TYPE_BONAIRE,
+	ATI_SPI_TYPE_BONAIRE, /* First of sea island type spi interface */
+	ATI_SPI_TYPE_HAWAII,
 };
 
 struct ati_spi_pci_private {
@@ -756,6 +757,18 @@ static const struct ati_spi_pci_private bonaire_spi_pci_private = {
 	.master = &ci_spi_master,
 };
 
+/*
+ * Used by Hawaii
+ */
+static const struct ati_spi_pci_private hawaii_spi_pci_private = {
+	.io_bar = CI_MMIO_BAR,
+	.type = ATI_SPI_TYPE_HAWAII,
+	.save = ci_spi_save,
+	.restore = ci_spi_restore,
+	.enable = ci_spi_enable,
+	.master = &ci_spi_master,
+};
+
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x6640, NT, &bonaire_spi_pci_private},
 	{0x1002, 0x6641, NT, &bonaire_spi_pci_private},
@@ -806,6 +819,16 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x6778, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x6779, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x677B, NT, &northern_island_spi_pci_private},
+	{0x1002, 0x67A0, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67A1, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67A2, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67A8, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67A9, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67AA, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67B0, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67B1, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67B9, NT, &hawaii_spi_pci_private},
+	{0x1002, 0x67BE, NT, &hawaii_spi_pci_private},
 	{0x1002, 0x6840, NT, &southern_island_spi_pci_private},
 	{0x1002, 0x6841, NT, &southern_island_spi_pci_private},
 	{0x1002, 0x6842, NT, &southern_island_spi_pci_private},
