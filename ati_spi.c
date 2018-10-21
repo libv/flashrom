@@ -36,6 +36,7 @@ enum ati_spi_type {
 	ATI_SPI_TYPE_SOUTHERN_ISLAND,
 	ATI_SPI_TYPE_BONAIRE, /* First of sea island type spi interface */
 	ATI_SPI_TYPE_HAWAII,
+	ATI_SPI_TYPE_ICELAND,
 };
 
 struct ati_spi_pci_private {
@@ -586,8 +587,10 @@ ci_spi_enable(struct flashrom_pci_device *device)
 		mmio_mask(CI_GPIOPAD_A, 0x40000000, 0x40000000);
 	}
 
-	/* disable open drain pads */
-	smc_mask(CI_GENERAL_PWRMGT, 0, 0x0800);
+	if ((private->type != ATI_SPI_TYPE_BONAIRE) &&
+	    (private->type != ATI_SPI_TYPE_HAWAII))
+		/* disable open drain pads */
+		smc_mask(CI_GENERAL_PWRMGT, 0, 0x0800);
 
 	programmer_delay(1000);
 
@@ -769,6 +772,18 @@ static const struct ati_spi_pci_private hawaii_spi_pci_private = {
 	.master = &ci_spi_master,
 };
 
+/*
+ * Used by Iceland
+ */
+static const struct ati_spi_pci_private iceland_spi_pci_private = {
+	.io_bar = CI_MMIO_BAR,
+	.type = ATI_SPI_TYPE_ICELAND,
+	.save = ci_spi_save,
+	.restore = ci_spi_restore,
+	.enable = ci_spi_enable,
+	.master = &ci_spi_master,
+};
+
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x6640, NT, &bonaire_spi_pci_private},
 	{0x1002, 0x6641, NT, &bonaire_spi_pci_private},
@@ -875,6 +890,9 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x68F9, NT, &evergreen_spi_pci_private},
 	{0x1002, 0x68FA, NT, &evergreen_spi_pci_private},
 	{0x1002, 0x68FE, NT, &evergreen_spi_pci_private},
+	{0x1002, 0x6900, NT, &iceland_spi_pci_private},
+	{0x1002, 0x6901, NT, &iceland_spi_pci_private},
+	{0x1002, 0x6907, NT, &iceland_spi_pci_private},
 	{0x1002, 0x9400, NT, &r600_spi_pci_private},
 	{0x1002, 0x9401, NT, &r600_spi_pci_private},
 	{0x1002, 0x9402, NT, &r600_spi_pci_private},
