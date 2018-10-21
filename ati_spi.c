@@ -757,6 +757,16 @@ static const struct ati_spi_pci_private bonaire_spi_pci_private = {
 };
 
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
+	{0x1002, 0x6640, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x6641, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x6646, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x6647, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x6649, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x6650, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x6651, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x6658, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x665C, NT, &bonaire_spi_pci_private},
+	{0x1002, 0x665D, NT, &bonaire_spi_pci_private},
 	{0x1002, 0x665F, OK, &bonaire_spi_pci_private},
 	{0x1002, 0x6704, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x6707, NT, &northern_island_spi_pci_private},
