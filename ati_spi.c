@@ -436,7 +436,13 @@ static const struct ati_spi_pci_private southern_island_spi_pci_private = {
 
 #define CI_ROM_CNTL			0xC0600000
 #define CI_PAGE_MIRROR_CNTL		0xC0600004
+#define CI_ROM_SW_CNTL			0xC060001C
 #define CI_ROM_SW_STATUS		0xC0600020
+#define CI_ROM_SW_COMMAND		0xC0600024
+#define CI_ROM_SW_DATA_0x00		0xC0600028
+/* ... */
+#define CI_ROM_SW_DATA_0xFC		0xC0600124
+#define CI_ROM_SW_DATA(off)		(CI_ROM_SW_DATA_0x00 + (off))
 
 #define CI_ROM_SW_STATUS_LOOP_COUNT 1000
 
@@ -625,6 +631,9 @@ ci_spi_command(struct flashctx *flash,
 	const struct spi_master spi_master = flash->mst->spi;
 	struct flashrom_pci_device *device =
 		(struct flashrom_pci_device *) spi_master.data;
+	const struct ati_spi_pci_private *private = device->private;
+	uint32_t command, control;
+	int i, command_size;
 
 	msg_pdbg("%s(%p(%p), %d, %d, %p (0x%02X), %p);\n", __func__, flash,
 		 device, writecnt, readcnt, writearr, writearr[0], readarr);
@@ -632,6 +641,91 @@ ci_spi_command(struct flashctx *flash,
 	if (!device) {
 		msg_perr("%s: no device specified!\n", __func__);
 		return -1;
+	}
+
+	command = writearr[0];
+	if (writecnt > 1)
+		command |= writearr[1] << 24;
+	if (writecnt > 2)
+		command |= writearr[2] << 16;
+	if (writecnt > 3)
+		command |= writearr[3] << 8;
+
+	if (writecnt < 4)
+		command_size = writecnt;
+	else
+		command_size = 4;
+
+	smc_write(CI_ROM_SW_COMMAND, command);
+
+	/*
+	 * For some reason, we have an endianness difference between reading
+	 * and writing. Also, ati hw only does 32bit register write accesses.
+	 * If you write 8bits, the upper bytes will be nulled. Reading is fine.
+	 * Furthermore, due to flashrom infrastructure, we need to skip the
+	 * command in the writearr.
+	 */
+	for (i = 4; i < writecnt; i += 4) {
+		uint32_t value = 0;
+		int remainder = writecnt - i;
+
+		if (remainder > 4)
+			remainder = 4;
+
+		if (remainder > 0)
+			value |= writearr[i + 0] << 24;
+		if (remainder > 1)
+			value |= writearr[i + 1] << 16;
+		if (remainder > 2)
+			value |= writearr[i + 2] << 8;
+		if (remainder > 3)
+			value |= writearr[i + 3] << 0;
+
+		/* Bonaire has a gap between 0xD8 and 0xE8 */
+		if ((private->type == ATI_SPI_TYPE_BONAIRE) && (i >= 0xdc))
+			smc_write(CI_ROM_SW_DATA(i + 0x0C), value);
+		else
+			smc_write(CI_ROM_SW_DATA(i - 4), value);
+	}
+
+	control = (command_size - 1) << 0x10;
+	if (readcnt)
+		control |= 0x40000 | readcnt;
+	else if (writecnt > 4)
+		control |= writecnt - 4;
+	smc_write(CI_ROM_SW_CNTL, control);
+
+	for (i = 0; i < CI_ROM_SW_STATUS_LOOP_COUNT; i++) {
+		if (smc_read(CI_ROM_SW_STATUS))
+			break;
+		programmer_delay(1000);
+	}
+
+	if (i == CI_ROM_SW_STATUS_LOOP_COUNT) {
+		msg_perr("%s: still waiting for CI_ROM_SW_STATUS\n",
+			 __func__);
+		return -1;
+	}
+	smc_write(CI_ROM_SW_STATUS, 0);
+
+	for (i = 0; i < readcnt; i += 4) {
+		uint32_t value;
+		int remainder = readcnt - i;
+
+		/* Bonaire has a gap between 0xD8 and 0xE8 */
+		if ((private->type == ATI_SPI_TYPE_BONAIRE) && (i >= 0xd8))
+			value = smc_read(CI_ROM_SW_DATA(i + 0x10));
+		else
+			value = smc_read(CI_ROM_SW_DATA(i));
+
+		if (remainder > 0)
+			readarr[i] = value;
+		if (remainder > 1)
+			readarr[i + 1] = value >> 8;
+		if (remainder > 2)
+			readarr[i + 2] = value >> 16;
+		if (remainder > 3)
+			readarr[i + 3] = value >> 24;
 	}
 
 	return 0;
