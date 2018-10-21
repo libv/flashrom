@@ -34,6 +34,7 @@ enum ati_spi_type {
 	ATI_SPI_TYPE_EVERGREEN,
 	ATI_SPI_TYPE_NORTHERN_ISLAND,
 	ATI_SPI_TYPE_SOUTHERN_ISLAND,
+	ATI_SPI_TYPE_BONAIRE,
 };
 
 struct ati_spi_pci_private {
@@ -417,7 +418,123 @@ static const struct ati_spi_pci_private southern_island_spi_pci_private = {
 	.master = &r600_spi_master,
 };
 
+/*
+ * Sea Island support.
+ */
+#define CI_MMIO_BAR			5
+
+#define CI_SPI_TRANSFER_SIZE 0x100
+
+struct ci_spi_data {
+	uint32_t empty;
+};
+
+/*
+ * Save for later restore.
+ */
+static int
+ci_spi_save(struct flashrom_pci_device *device)
+{
+	struct ci_spi_data *data;
+
+	msg_pdbg("%s();\n", __func__);
+
+	if (device->private_data) {
+		msg_perr("%s: device->private_data is already assigned.\n",
+			 __func__);
+		return -1;
+	}
+
+	data = calloc(1, sizeof(struct ci_spi_data));
+
+	device->private_data = data;
+
+	return 0;
+}
+
+/*
+ * Restore saved registers, in the order of enable writes.
+ */
+static int
+ci_spi_restore(struct flashrom_pci_device *device)
+{
+	struct ci_spi_data *data = device->private_data;
+
+	msg_pdbg("%s();\n", __func__);
+
+	if (!data) {
+		msg_perr("%s: device->private_data is not assigned.\n",
+			 __func__);
+		return -1;
+	}
+
+	free(data);
+	device->private_data = NULL;
+
+	return 0;
+}
+
+/*
+ * Enable SPI Access.
+ */
+static int
+ci_spi_enable(struct flashrom_pci_device *device)
+{
+	msg_pdbg("%s();\n", __func__);
+
+	return 0;
+}
+
+/*
+ *
+ */
+static int
+ci_spi_command(struct flashctx *flash,
+	       unsigned int writecnt, unsigned int readcnt,
+	       const unsigned char *writearr, unsigned char *readarr)
+{
+	const struct spi_master spi_master = flash->mst->spi;
+	struct flashrom_pci_device *device =
+		(struct flashrom_pci_device *) spi_master.data;
+
+	msg_pdbg("%s(%p(%p), %d, %d, %p (0x%02X), %p);\n", __func__, flash,
+		 device, writecnt, readcnt, writearr, writearr[0], readarr);
+
+	if (!device) {
+		msg_perr("%s: no device specified!\n", __func__);
+		return -1;
+	}
+
+	return 0;
+}
+
+static struct spi_master ci_spi_master = {
+	.type = SPI_CONTROLLER_ATI,
+	.features = 0,
+	.max_data_read = CI_SPI_TRANSFER_SIZE,
+	.max_data_write = CI_SPI_TRANSFER_SIZE + 1,
+	.command = ci_spi_command,
+	.multicommand = default_spi_send_multicommand,
+	.read = default_spi_read,
+	.write_256 = default_spi_write_256,
+	.write_aai = default_spi_write_aai,
+	.data = NULL, /* make this our flashrom_pci_device... */
+};
+
+/*
+ * Used by Bonaire
+ */
+static const struct ati_spi_pci_private bonaire_spi_pci_private = {
+	.io_bar = CI_MMIO_BAR,
+	.type = ATI_SPI_TYPE_BONAIRE,
+	.save = ci_spi_save,
+	.restore = ci_spi_restore,
+	.enable = ci_spi_enable,
+	.master = &ci_spi_master,
+};
+
 const struct flashrom_pci_match ati_spi_pci_devices[] = {
+	{0x1002, 0x665F, OK, &bonaire_spi_pci_private},
 	{0x1002, 0x6704, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x6707, NT, &northern_island_spi_pci_private},
 	{0x1002, 0x6718, NT, &northern_island_spi_pci_private},
