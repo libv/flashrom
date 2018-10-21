@@ -436,6 +436,9 @@ static const struct ati_spi_pci_private southern_island_spi_pci_private = {
 
 #define CI_ROM_CNTL			0xC0600000
 #define CI_PAGE_MIRROR_CNTL		0xC0600004
+#define CI_ROM_SW_STATUS		0xC0600020
+
+#define CI_ROM_SW_STATUS_LOOP_COUNT 1000
 
 #define CI_SPI_TRANSFER_SIZE 0x100
 
@@ -454,6 +457,15 @@ _ci_smc_write(struct flashrom_pci_device *device, off_t address, uint32_t value)
 	mmio_write(CI_SMC1_DATA, value);
 }
 #define smc_write(reg, val) _ci_smc_write(device, (reg), (val))
+
+static void
+_ci_smc_mask(struct flashrom_pci_device *device, off_t address,
+	    uint32_t value, uint32_t mask)
+{
+	mmio_write(CI_SMC1_INDEX, address);
+	mmio_mask(CI_SMC1_DATA, value, mask);
+}
+#define smc_mask(reg, val, mask) _ci_smc_mask(device, (reg), (val), (mask))
 
 struct ci_spi_data {
 	uint32_t reg_gpiopad_mask;
@@ -536,7 +548,68 @@ ci_spi_restore(struct flashrom_pci_device *device)
 static int
 ci_spi_enable(struct flashrom_pci_device *device)
 {
+	const struct ati_spi_pci_private *private = device->private;
+	int i;
+
 	msg_pdbg("%s();\n", __func__);
+
+	/* set sck divider to 1 */
+	smc_mask(CI_ROM_CNTL, 0x10000000, 0xF0000000);
+	/* software enable clock gating */
+	if (private->type == ATI_SPI_TYPE_BONAIRE) {
+		uint32_t drm = mmio_read(CI_DRM_ID_STRAPS);
+
+		if (drm & 0xF0000000)
+			smc_mask(CI_ROM_CNTL, 0, 0x0000002);
+		else
+			smc_mask(CI_ROM_CNTL, 0x0000002, 0x0000002);
+	} else
+		smc_mask(CI_ROM_CNTL, 0x00000002, 0x00000002);
+
+	/* set gpio7,8,9 low */
+	mmio_mask(CI_GPIOPAD_A, 0, 0x0700);
+	/* gpio7 is input, gpio8/9 are output */
+	mmio_mask(CI_GPIOPAD_EN, 0x0600, 0x0700);
+	/* only allow software control on gpio7,8,9 */
+	mmio_mask(CI_GPIOPAD_MASK, 0x0700, 0x0700);
+
+	if (private->type != ATI_SPI_TYPE_BONAIRE) {
+		mmio_mask(CI_GPIOPAD_MASK, 0x40000000, 0x40000000);
+		mmio_mask(CI_GPIOPAD_EN, 0x40000000, 0x40000000);
+		mmio_mask(CI_GPIOPAD_A, 0x40000000, 0x40000000);
+	}
+
+	/* disable open drain pads */
+	smc_mask(CI_GENERAL_PWRMGT, 0, 0x0800);
+
+	programmer_delay(1000);
+
+	mmio_mask(CI_GPIOPAD_MASK, 0, 0x700);
+	mmio_mask(CI_GPIOPAD_EN, 0, 0x700);
+	mmio_mask(CI_GPIOPAD_A, 0, 0x700);
+
+	/* this feels like a remnant of generations past */
+	mmio_mask(CI_GPIOPAD_MASK, 0, 0x80000);
+	mmio_mask(CI_GPIOPAD_EN, 0, 0x80000);
+	mmio_mask(CI_GPIOPAD_A, 0, 0x80000);
+
+	/* page mirror usage */
+	smc_mask(CI_PAGE_MIRROR_CNTL, 0x04000000, 0x0C000000);
+
+	if (smc_read(CI_ROM_SW_STATUS)) {
+		for (i = 0; i < CI_ROM_SW_STATUS_LOOP_COUNT; i++) {
+			smc_write(CI_ROM_SW_STATUS, 0);
+			programmer_delay(1000);
+			if (!smc_read(CI_ROM_SW_STATUS))
+				break;
+		}
+
+		if (i == CI_ROM_SW_STATUS_LOOP_COUNT) {
+			msg_perr("%s: failed to clear CI_ROM_SW_STATUS\n",
+				 __func__);
+			return -1;
+		}
+	}
 
 	return 0;
 }
