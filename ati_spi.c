@@ -773,7 +773,7 @@ static const struct ati_spi_pci_private hawaii_spi_pci_private = {
 };
 
 /*
- * Used by Iceland
+ * Used by Iceland, Tonga
  */
 static const struct ati_spi_pci_private iceland_spi_pci_private = {
 	.io_bar = CI_MMIO_BAR,
@@ -893,6 +893,12 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x6900, NT, &iceland_spi_pci_private},
 	{0x1002, 0x6901, NT, &iceland_spi_pci_private},
 	{0x1002, 0x6907, NT, &iceland_spi_pci_private},
+	{0x1002, 0x6921, NT, &iceland_spi_pci_private},
+	{0x1002, 0x6929, NT, &iceland_spi_pci_private},
+	{0x1002, 0x692B, NT, &iceland_spi_pci_private},
+	{0x1002, 0x692F, NT, &iceland_spi_pci_private},
+	{0x1002, 0x6938, NT, &iceland_spi_pci_private},
+	{0x1002, 0x6939, NT, &iceland_spi_pci_private},
 	{0x1002, 0x9400, NT, &r600_spi_pci_private},
 	{0x1002, 0x9401, NT, &r600_spi_pci_private},
 	{0x1002, 0x9402, NT, &r600_spi_pci_private},
