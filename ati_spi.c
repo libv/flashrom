@@ -774,7 +774,7 @@ static const struct ati_spi_pci_private hawaii_spi_pci_private = {
 
 /*
  * Used by Iceland, Tonga, Fiji, Ellesmere/Polaris10, Baffin/Polaris11,
- * Polaris12
+ * Polaris12, Polaris22.
  */
 static const struct ati_spi_pci_private iceland_spi_pci_private = {
 	.io_bar = CI_MMIO_BAR,
@@ -917,6 +917,8 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x692F, NT, &iceland_spi_pci_private},
 	{0x1002, 0x6938, NT, &iceland_spi_pci_private},
 	{0x1002, 0x6939, NT, &iceland_spi_pci_private},
+	{0x1002, 0x694C, NT, &iceland_spi_pci_private},
+	{0x1002, 0x694E, NT, &iceland_spi_pci_private},
 	{0x1002, 0x6980, NT, &iceland_spi_pci_private},
 	{0x1002, 0x6981, NT, &iceland_spi_pci_private},
 	{0x1002, 0x6985, NT, &iceland_spi_pci_private},
