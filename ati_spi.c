@@ -408,7 +408,7 @@ static const struct ati_spi_pci_private northern_island_spi_pci_private = {
 };
 
 /*
- * Used by Lombok.
+ * Used by Lombok & Cape Verde PRO
  * Verde, Pitcairn, Hainan and Oland are pending.
  */
 static const struct ati_spi_pci_private southern_island_spi_pci_private = {
@@ -862,6 +862,7 @@ const struct flashrom_pci_match ati_spi_pci_devices[] = {
 	{0x1002, 0x67EB, NT, &iceland_spi_pci_private},
 	{0x1002, 0x67EF, NT, &iceland_spi_pci_private},
 	{0x1002, 0x67FF, NT, &iceland_spi_pci_private},
+	{0x1002, 0x683F, NT, &southern_island_spi_pci_private},
 	{0x1002, 0x6840, NT, &southern_island_spi_pci_private},
 	{0x1002, 0x6841, NT, &southern_island_spi_pci_private},
 	{0x1002, 0x6842, NT, &southern_island_spi_pci_private},
